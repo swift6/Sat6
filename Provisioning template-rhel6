@@ -79,7 +79,7 @@ exec < /dev/tty3 > /dev/tty3
 cp -va /etc/resolv.conf /mnt/sysimage/etc/resolv.conf
 # If building VM in different location, it needs to be able to resolve the Satellite to an address on the build subnet.
 <% if @host.subnet.gateway == "172.17.30.1" -%>
-echo "nameserver 172.17.30.82" >> /mnt/sysimage/etc/resolv.conf
+echo "nameserver 172.17.30.150" >> /mnt/sysimage/etc/resolv.conf
 <% end -%>
 /usr/bin/chvt 1
 ) 2>&1 | tee /mnt/sysimage/root/install.postnochroot.log
@@ -93,7 +93,7 @@ exec < /dev/tty3 > /dev/tty3
 /usr/bin/chvt 3
 (
 <% if subnet.respond_to?(:dhcp_boot_mode?) -%>
-<%= snippet 'kickstart_networking_setup_cyb' %>
+<%= snippet 'kickstart_networking_setup' %>
 <% end -%>
 
 #update local time
@@ -105,7 +105,7 @@ echo "updating system time"
 <% if @host.subnet.gateway == "172.17.30.1" -%>
 echo "172.17.30.90   sat6server.mydomain.com sat6server" > /etc/hosts
 <% end -%>
-<%= snippet "subscription_manager_register_with_etc_hosts" %>
+<%= snippet "subscription_manager_register_with_hostsfile" %>
 
 <% if @host.respond_to?(:realm) && @host.otp && @host.realm && @host.realm.realm_type == "Red Hat Identity Management" -%>
 <%= snippet "idm_register" %>
@@ -152,9 +152,9 @@ wget -q -O /dev/null --no-check-certificate <%= foreman_url %>
 <%= snippet 'CYB RHEL6 NETWORK' %>
 
 # If building VM in different location, need to clean up /etc/resolv.conf and /etc/hosts.
-<% if @host.subnet.gateway == "172.29.152.1" -%>
-sed -i '/172.17.30.90/d' /etc/resolv.conf
-sed -i '/172.17.30.90/d' /etc/hosts
+<% if @host.subnet.gateway == "172.17.30.1" -%>
+sed -i '/172.17.30.95/d' /etc/resolv.conf
+sed -i '/172.17.30.95/d' /etc/hosts
 <% end -%>
 
 exit 0
