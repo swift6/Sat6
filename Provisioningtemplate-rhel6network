@@ -1,6 +1,6 @@
 <%#
 kind: snippet
-name: CYB RHEL6 NETWORK
+name: RHEL6 NETWORK
 description: to configure interfaces. Intended to be called from %post in  kickstart template
 %>
 
@@ -14,7 +14,7 @@ ip2dec () {
 # set a flag we'll use later
 matched=0
 
-pubip=`dig @172.17.30.85 $(hostname) +short`
+pubip=`dig @172.17.30.150 $(hostname) +short`
 echo $pubip > /root/networksnippet.log
 
 # convert the pub ip for comparison
