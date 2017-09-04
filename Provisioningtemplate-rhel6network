@@ -1,0 +1,75 @@
+<%#
+kind: snippet
+name: CYB RHEL6 NETWORK
+description: to configure interfaces. Intended to be called from %post in  kickstart template
+%>
+
+# Function to convert the IP's to decimal for some easy maths
+ip2dec () {
+    local a b c d ip=$@
+    IFS=. read -r a b c d <<< "$ip"
+    printf '%d\n' "$((a * 256 ** 3 + b * 256 ** 2 + c * 256 + d))"
+}
+
+# set a flag we'll use later
+matched=0
+
+pubip=`dig @172.17.30.85 $(hostname) +short`
+echo $pubip > /root/networksnippet.log
+
+# convert the pub ip for comparison
+dechost=`ip2dec ${pubip}`
+echo $dechost >> /root/networksnippet.log
+
+# grab the lookup file
+wget -q http://sat6server.mydomain.com/pub/ip-lookup -O- > /tmp/ip-lookup
+egrep -v "^#" /tmp/ip-lookup | egrep "^." > /tmp/ip-lookup2
+
+# inserted for debug prposes
+cp /tmp/ip-lookup2 /root
+
+while read start finish mask gateway; do
+# Decimal conversions
+ decStart=`ip2dec ${start}`
+ echo $decStart >> /root/networksnippet.log
+ decFinish=`ip2dec ${finish}`
+ echo $decFinish >> /root/networksnippet.log
+ # compare the decimal ip against the range we are comparing.
+ if [ "${dechost}" -gt "${decStart}" ] && [ "${dechost}" -lt "${decFinish}" ]
+ then
+  # we have a winner! use these details to populate the network line
+  pubnetmask=${mask}
+  pubdefgw=${gateway}
+  matched=1
+  echo "MATCHED" >> /root/networksnippet.log
+  continue
+ fi
+done < /tmp/ip-lookup2
+rm -f /tmp/ip-lookup*
+
+if [ "${matched}" == "0" ]
+then
+ pubdefgw=`echo $pubip | awk -F. '{print $1 "." $2 "." $3 ".1"}'`
+ pubnetmask=255.255.255.0
+ echo "NOT MATCHED" >> /root/networksnippet.log
+fi
+
+echo $pubip
+echo $pubnetmask
+echo $pubdefgw
+
+echo $pubip >> /root/networksnippet.log
+echo $pubnetmask >> /root/networksnippet.log
+echo $pubdefgw >> /root/networksnippet.log
+
+# Hack the ifcfg-eth1 config file and flip the interfaces
+echo "Editing network scripts to flip the interfaces..."
+sed -i 's/BOOTPROTO="dhcp"/BOOTPROTO="static"/g' /etc/sysconfig/network-scripts/ifcfg-eth1
+sed -i 's/ONBOOT="no"/ONBOOT="yes"/g' /etc/sysconfig/network-scripts/ifcfg-eth1
+sed -i '/DHCP_HOSTNAME/d' /etc/sysconfig/network-scripts/ifcfg-eth1
+echo "IPADDR=\"$pubip\"" >> /etc/sysconfig/network-scripts/ifcfg-eth1
+echo "DNS1=\"172.17.30.150\"" >> /etc/sysconfig/network-scripts/ifcfg-eth1
+echo "DNS2=\"172.17.30.250\"" >> /etc/sysconfig/network-scripts/ifcfg-eth1
+echo "NETMASK=\"$pubnetmask\"" >> /etc/sysconfig/network-scripts/ifcfg-eth1
+echo "GATEWAY=\"$pubdefgw\"" >> /etc/sysconfig/network-scripts/ifcfg-eth1
+sed -i '/ONBOOT/s/yes/no/g' /etc/sysconfig/network-scripts/ifcfg-eth0
