@@ -9,10 +9,6 @@
 > goferd should only run on Satellite if self-registered
 > qdrouterd on the Capsule is connected to qdrouterd on Satellite on port 5646
 
----CLI access---
-Sat5.6 - root/RHEL6pw
-Sat6 - root/RHEL7pw
-
 Alt + F2 to open shell when kickstart fails
 
 
@@ -71,20 +67,6 @@ Alt + F2 to open shell when kickstart fails
 
 
 [/var/tmp/sos.Ww7QJR] - sosreport
-
-
-
-
------Servers-----
-[vrhsatp201] - Site 2 Prod Satellite
-[vrhsatp101] - Site 1 Prod capsule (Foreman discovery only)
-[vrhsatz201] - Site 2 DMZ capsule
-
-[vrhsatp202] - Site 2 Prod replacement
-
---Continuous Delivery--
-[vrhinvx203] - Site 1 Prod capsule
-[vrhsatu201] - Site 2 Prod Satellite
 
 
 
@@ -215,15 +197,6 @@ Success!
 
 > List discovery rules
 [root@vrhsatp201 ~]# hammer discovery_rule list
----|---------------------|----------|-------------------------|-------------------------|-------------|--------
-ID | NAME                | PRIORITY | SEARCH                  | HOST GROUP              | HOSTS LIMIT | ENABLED
----|---------------------|----------|-------------------------|-------------------------|-------------|--------
-4  | CYB_RHEL6_Site1     | 0        | subnet = 172.29.56.0    | CYB RHEL6 Site1 Prod    | 0           | true
-3  | CYB_RHEL6_Site2     | 0        | subnet = 172.29.152.0   | CYB RHEL7 Site2 Library | 0           | true
-5  | CYB_RHEL6_Site2_DMZ | 0        | subnet = 10.207.209.192 | CYB RHEL6 Site2 DMZ     | 0           | true
-7  | Site_1              | 0        | subnet = 172.29.56.0    | CYB RHEL6 Site1 Test    | 0           | true
-6  | Site_2              | 0        | subnet = 172.29.152.0   | CYB RHEL6 Site2 Test    | 0           | true
----|---------------------|----------|-------------------------|-------------------------|-------------|--------
 
 > Delete a discovery rule
 # hammer discovery_rule delete --id Site_2
