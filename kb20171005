@@ -1,0 +1,2102 @@
+-----Notizen-----
+> Sat 6 is based primarily on Foreman. Sat 5 was based on Spacewalk.
+> Generate #sosreport and #foreman-debug for attaching to Redhat case.
+> MongoDB database manages Pulp data
+> Capsule Server using one z-stream version older than the Satellite Server is supported e.g. 6.2.8 Satellite can run 6.2.7 Capsule
+> You can register Red Hat subscriptions using username/password or OrgID/activation-key
+> katello agent communicates with the satellite's qpid dispatch router (qdrouterd)
+> goferd daemon (katello agent daemon that installs errata/packages to client machines)
+> goferd should only run on Satellite if self-registered
+> qdrouterd on the Capsule is connected to qdrouterd on Satellite on port 5646
+
+---CLI access---
+Sat5.6 - root/RHEL6pw
+Sat6 - root/RHEL7pw
+
+Alt + F2 to open shell when kickstart fails
+
+
+
+
+-----Locations-----
+[/etc/rhsm/rhsm.conf] - Red Hat Subscription Management config
+[/etc/rhsm/ca] - CA certs
+[/etc/yum.repos.d/redhat.repo] - Configured repositories on a server
+
+[/var/log/foreman/production.log] - Foreman production log
+[/var/log/foreman-installer/satellite.log] - Check Satellite install process completed successfully
+[/var/log/foreman-installer/capsule.log] - Capsule log
+[/var/log/foreman-proxy/proxy.log] - Foreman proxy logs
+[/etc/foreman-proxy/settings.yml] - Foreman proxy settings file
+[/usr/share/foreman/lib/tasks] - Contains scripts executed by foreman-rake command
+[/usr/share/foreman-discovery-image] - Foreman discovery image
+[/tmp/foreman-debug-swEHQ.tar.xz] - Foreman debug output
+[/opt/theforeman/tfm/root/usr/share/gems/gems/katello-3.0.0.105/lib/katello/tasks] - foreman rake scripts
+
+
+[/var/log/katello-installer/katello-installer.log] - Katello installer log
+[/etc/pki/katello/private/katello-apache.key] - Katello web sockets key
+[/etc/pki/katello/certs/katello-apache.crt] - Katello web sockets certificate
+
+[/var/lib/tftpboot/pxelinux.cfg/default] - PXE boot menu and parameters config **this file must be in place
+[/var/lib/tftpboot/pxelinux.cfg] - Directory where TFTP boot image is created during auto provision
+[/var/lib/tftpboot/boot] - .vmlinuz and .initrd.img images
+
+[/var/lib/pulp] - Pulp database
+[/etc/pulp/server.conf] - Pulp config
+[/etc/pulp/server/plugins.conf.d/yum_importer.json] - Pulp repos proxy config
+
+[/var/lib/puppet/ssl/certs/] - Puppet certs
+[/var/lib/puppet/ssl/ca/signed/] - Puppet signed certs
+[/etc/puppet/puppet.conf] - Puppet config
+
+[/etc/rhsm/rhsm.conf] - RHSM config file
+[/etc/pki/consumer] - RHSM local system cert.pem and key.pem
+[/etc/pki/product] - RHSM installed product certs
+[/etc/pki/entitlement] - RHSM subscriptions attached to local system
+
+[/var/named/dynamic] - DNS zone files
+[/etc/zones.conf] - DNS zones config
+[rndc status] - DNS status
+
+[/var/log/squid/access.log] - Squid log
+
+[/var/log/candlepin/candlepin.log] - Candlepin log
+
+
+[/etc/virt-who.conf] - Virt-who config
+[/etc/virt-who.d/vcenter1]
+[/etc/virt-who.d/vcenter2]
+[/etc/sysconfig/virt-who] - virt-who proxy config
+
+
+[/var/tmp/sos.Ww7QJR] - sosreport
+
+
+
+
+-----Servers-----
+[vrhsatp201] - Site 2 Prod Satellite
+[vrhsatp101] - Site 1 Prod capsule (Foreman discovery only)
+[vrhsatz201] - Site 2 DMZ capsule
+
+[vrhsatp202] - Site 2 Prod replacement
+
+--Continuous Delivery--
+[vrhinvx203] - Site 1 Prod capsule
+[vrhsatu201] - Site 2 Prod Satellite
+
+
+
+-----Satellite 6 Components-----
+- Puppet for Configuration
+- Foreman for Provisioning
+- Katello for Content/Life Cycle Management (developed by Red Hat. Uses pulp in the background)
+- Pulp for Repo Management
+- Candlepin for Subscription Management. (connects to Red Hat portal for available licenses)
+**Capsule server is part of Katello
+
+foreman-1.7.2.56-1.el7sat.noarch
+katello-2.2.0.19-1.el7sat.noarch
+candlepin-0.9.49.12-1.el7.noarch
+puppet-3.6.2-4.el7sat.noarch
+pulp-server-2.6.0.21-1.el7sat.noarch
+virt-who (reports VM guests to Satellite)
+
+
+
+
+-----Manage services-----
+> Restart Satellite 6.2.x services
+[root@vrhsatp201 ~]# katello-service restart
+Redirecting to /bin/systemctl stop  foreman-tasks.service
+Redirecting to /bin/systemctl stop  httpd.service
+Redirecting to /bin/systemctl stop  pulp_workers.service
+Redirecting to /bin/systemctl stop  foreman-proxy.service
+Redirecting to /bin/systemctl stop  pulp_streamer.service
+Redirecting to /bin/systemctl stop  pulp_resource_manager.service
+Redirecting to /bin/systemctl stop  pulp_celerybeat.service
+Redirecting to /bin/systemctl stop  smart_proxy_dynflow_core.service
+Redirecting to /bin/systemctl stop  tomcat.service
+Redirecting to /bin/systemctl stop  squid.service
+Redirecting to /bin/systemctl stop  qdrouterd.service
+Redirecting to /bin/systemctl stop  qpidd.service
+Redirecting to /bin/systemctl stop  postgresql.service
+Redirecting to /bin/systemctl stop  mongod.service
+Success!
+
+Redirecting to /bin/systemctl start  mongod.service
+Redirecting to /bin/systemctl start  postgresql.service
+Redirecting to /bin/systemctl start  qpidd.service
+Redirecting to /bin/systemctl start  qdrouterd.service
+Redirecting to /bin/systemctl start  squid.service
+Redirecting to /bin/systemctl start  tomcat.service
+Redirecting to /bin/systemctl start  smart_proxy_dynflow_core.service
+Redirecting to /bin/systemctl start  pulp_celerybeat.service
+Redirecting to /bin/systemctl start  pulp_resource_manager.service
+Redirecting to /bin/systemctl start  pulp_streamer.service
+Redirecting to /bin/systemctl start  foreman-proxy.service
+Redirecting to /bin/systemctl start  pulp_workers.service
+Redirecting to /bin/systemctl start  httpd.service
+Redirecting to /bin/systemctl start  foreman-tasks.service
+Success!
+
+
+***Satellite 6.1 does not have the following services
+> squid.service
+> smart_proxy_dynflow_core.service
+> pulp_streamer.service
+
+
+# katello-service stop
+# katello-service status
+
+
+> Stop foreman-tasks service
+# systemctl stop foreman-tasks
+
+> Start foreman-tasks service
+# systemctl start foreman-tasks
+
+> Generate katello-backup
+# katello-backup --skip-pulp-content --online-backup /backup
+
+
+
+
+-----Hammer-----
+> Commands
+# hammer --help / hammer -h
+
+> Check Satellite components are operational and responding
+# hammer ping
+
+> Info about orgs created on satellite in the form of ID, NAME, LABEL, DESCRIPTION
+# hammer organization info
+
+> List organizations
+# hammer organization list
+
+> List locations on satellite ID, NAME
+# hammer location list
+
+> List environments
+# hammer environment list
+
+> List capsules
+# hammer capsule list
+
+> List hosts in the form ID , NAME , OPERATING SYSTEM , HOST GROUP , IP , MAC
+# hammer host list
+
+> Details of capsule
+# hammer capsule info --id 6
+
+> List lifecycle environments
+# hammer lifecycle-environment list --organization-id 1
+
+> Delete host
+# hammer delete host --id 884
+
+> List all repos in organization
+# hammer repository list --organization CYB
+
+> Display specific repo info
+# hammer repository info --id 14
+
+> Synchronize repositories
+# hammer repository synchronize
+
+> List repositories and generate CSV
+# hammer --csv repository list --organization CYB
+
+> List content hosts and generate CSV
+# hammer --csv content-host list --organization CYB --search "not installed_package_name = katello-agent and not name ~ virt-who"
+
+> List discovery rules
+[root@vrhsatp201 ~]# hammer discovery_rule list
+---|---------------------|----------|-------------------------|-------------------------|-------------|--------
+ID | NAME                | PRIORITY | SEARCH                  | HOST GROUP              | HOSTS LIMIT | ENABLED
+---|---------------------|----------|-------------------------|-------------------------|-------------|--------
+4  | CYB_RHEL6_Site1     | 0        | subnet = 172.29.56.0    | CYB RHEL6 Site1 Prod    | 0           | true
+3  | CYB_RHEL6_Site2     | 0        | subnet = 172.29.152.0   | CYB RHEL7 Site2 Library | 0           | true
+5  | CYB_RHEL6_Site2_DMZ | 0        | subnet = 10.207.209.192 | CYB RHEL6 Site2 DMZ     | 0           | true
+7  | Site_1              | 0        | subnet = 172.29.56.0    | CYB RHEL6 Site1 Test    | 0           | true
+6  | Site_2              | 0        | subnet = 172.29.152.0   | CYB RHEL6 Site2 Test    | 0           | true
+---|---------------------|----------|-------------------------|-------------------------|-------------|--------
+
+> Delete a discovery rule
+# hammer discovery_rule delete --id Site_2
+
+> Create a discovery rule
+# hammer discovery_rule create --enabled 1 --hostgroup-id HG_name --hostname "<% hostname %> --name rhel72 --search  "facts.baseos = rhel7.2"
+
+> Run search on hammer with debug
+# hammer -d host list --organization CYB --search "not installed_package_name = katello-agent and not name ~ virt-who"
+
+> Run search on hammer generating output in CSV
+# hammer --csv host list --organization CYB --search "not installed_package_name = katello-agent and not name ~ virt-who"
+
+
+
+
+-----Query Satellite for katello-agent installations-----
+> Navigate to Hosts -> All hosts
+
+> Query for duplicate hosts
+name ~ vrhbigt201 or name ~ vrhaccu201 or name ~ vrhsb1 or name ~ vrhtoc1
+
+> Query Satellite for servers without open-vm-tools installed
+not installed_package_name = open-vm-tools
+
+> Query Satellite for servers with vmware-tools-foundation installed
+installed_package_name = vmware-tools-foundation
+
+not installed_package_name = katello-agent and not name ~ virt-who
+
+not installed_package = katello-agent-2.9.0-2.el6sat.noarch and not name ~ virt-who and not os ~ RedHat*
+not installed_package = katello-agent-2.9.0-2.el6sat.noarch and not installed_package = katello-agent-2.9.0-2.el5 and not name ~ virt-who
+not installed_package = katello-agent-2.9.0-2.el7sat.noarch and not name ~ virt-who
+
+> Check RHEL6/RHEL7 servers which katello-agent not installed
+not (installed_package = katello-agent-2.9.0-2.el6sat.noarch or installed_package = katello-agent-2.9.0-2.el7sat.noarch) and not name ~ virt-who
+
+not (installed_package = katello-agent-2.9.0-2.el6sat.noarch or installed_package = katello-agent-2.9.0-2.el7sat.noarch) and not name ~ virt-who
+
+
+
+
+-----Katello-----
+> katello-agent is a client-side agent installed on Content Hosts (Satellite Clients)
+-Provides goferd service which Satellite uses to obtain errata applicable for the client (content host).
+-Package installed from rhel-6-server-satellite-tools-6.2-rpms repository.
+
+> Orphaned RPMs cleaned up weekly - /etc/cron.weekly/katello-remove-orphans
+
+> Backup Satellite configs and databases
+# katello-backup --help
+Usage: katello-backup /path/to/dir [options]
+ eg: $ katello-backup /tmp/katello-backup
+
+# screen
+# katello-backup /backup --skip-pulp-content
+# katello-backup /var/lib/pgsql/ --skip-pulp-content
+
+629
+# katello-backup --skip-pulp-content --online-backup /backup
+Starting backup: 2017-06-16 15:57:34 +0100
+Creating backup folder /backup/katello-backup-2017-06-16T15:57:34+01:00
+Generating metadata ...
+/opt/theforeman/tfm/root/usr/share/gems/gems/foreman_theme_satellite-0.1.42/app/models/concerns/satellite_packages.rb:4: warning: already initialized constant Katello::Ping::PACKAGES
+/opt/theforeman/tfm/root/usr/share/gems/gems/katello-3.0.0.125/app/models/katello/ping.rb:7: warning: previous definition of PACKAGES was here
+Backing up config files...
+Done.
+Backing up postgres db...
+Done.
+Backing up mongo db...
+Done.
+Done with backup: 2017-06-16 16:05:01 +0100
+**** BACKUP Complete, contents can be found in: /backup/katello-backup-2017-06-16T15:57:34+01:00 ****
+
+> Install Satellite (replaced by satellite-installed in 6.2)
+# katello-installer 
+
+> Upgrade Satellite (replaced by satellite-installed in 6.2)
+# katello-installer --upgrade
+
+> Uninstall Satellite and all related components
+# katello-remove
+
+> Install katello-ca certs
+# 
+
+
+---Removing Paused/failed katello tasks---
+> Stop any paused tasks
+# systemctl stop foreman-tasks
+
+> Check paused / running tasks
+# foreman-rake console
+ForemanTasks::Task.where(:state => :paused)
+ForemanTasks::Task.where(:state => :paused).where(:label => "Actions::Katello::System::GenerateApplicability")
+ForemanTasks::Task.where(:state => :paused).where(:label => "Actions::Katello::System::GenerateApplicability").destroy_all
+ForemanTasks::Task.where(:state => :planned).where(:label => "Actions::Katello::Repository::Sync").destroy_all
+ForemanTasks::Task.where(:label => "Actions::Candlepin::ListenOnCandlepinEvents").destroy_all
+ForemanTasks::Task.where(:state => :paused).where(:label => "Actions::Katello::Repository::Sync")
+ForemanTasks::Task.where(:state => :paused).where(:label => "Actions::Katello::Repository::Sync").destroy_all
+ForemanTasks::Task.where(:state => :paused).destroy_all
+
+# systemctl start foreman-tasks
+
+
+
+---Removing Paused/failed katello tasks from DB---
+> List paused tasks using pgsql. Switch to postgres user
+[root@vrhsatp201 foreman]# su - postgres
+Last login: Mon Jan 18 16:16:20 GMT 2016 on pts/1
+
+> Access foreman database
+-bash-4.2$ psql foreman
+psql (9.2.10)
+Type "help" for help.
+
+> Select table
+foreman=# select * from foreman_tasks_tasks where state = 'paused';
+
+> To kill a specific task using foreman-rake
+[root@vrhsatp201 foreman]# foreman-rake console
+Loading production environment (Rails 3.2.8)
+irb(main):001:0>
+irb(main):001:0>ForemanTasks::Task.where(state => paused).where(:id => "79753c65-dde3-4584-9f86-7122fc6ea3c4").destroy_all
+
+> Then run the select query again in pgsql and the task should have disappeared....finally run the foreman-rake cleanup tasks:
+foreman-rake katello:delete_orphaned_content
+foreman-rake katello:reindex
+
+
+
+
+-----foreman-rake - Unify duplicate hosts-----
+> Unify all duplicate hosts by hostname (RH case 01712522)
+# foreman-rake katello:unify_hosts USE_NAME=true
+Unifying s2ogd9.eu.nag.net with s2ogd9
+Unifying s1ogd8.eu.nag.net with s1ogd8
+Unifying s1grd1.eu.nag.net with s1grd1
+Unifying s1fgi1.eu.nag.net with s1fgi1
+
+> Unify individual host
+# foreman-rake katello:unify_hosts HOSTS=vrhtoc1.eu.nag.net,vrhtoc1
+
+> virt_who_report checker for 6.2 (https://bugzilla.redhat.com/show_bug.cgi?id=1372912#c29)
+# foreman-rake katello:virt_who_report
+57 hypervisor issues found.
+38 guest issues found.
+0 errors encountered.
+Saving results to /tmp/virt_who_report20170424-50377-113ymxp/.
+
+
+
+
+-----foreman-debug-----
+> foreman-debug utility (/usr/sbin/foreman-debug) generates an archive containing Satellite 6 files with
+debugging information (such as configuration and log files)
+
+[root@vrhsatp201 ~]# foreman-debug
+Processing... (takes a while)Exporting tasks, this may take a few minutes.
+Copying entire file: /tmp/task-export-1497273914.tar.gz
+
+ HOSTNAME: vrhsatp201.eu.nag.net
+       OS: redhat
+  RELEASE: Red Hat Enterprise Linux Server release 7.3 (Maipo)
+  FOREMAN: 1.11.0.76
+     RUBY: ruby 2.0.0p648 (2015-12-16) [x86_64-linux]
+   PUPPET: 3.8.6
+  DENIALS: 0
+
+A debug file has been created: /tmp/foreman-debug-5I1Gx.tar.xz (4517856 bytes)
+To upload a tarball to our secure site, please use the -u option.
+
+
+
+
+-----Candlepin - Manifests-----
+> Manifest should only be uploaded once then refreshed subsequently every time after.
+> Do NOT delete manifest from Satellite, only refresh **deleting removes subs from all activation keys
+This leaves us unable to enable/disable new repos for existing VMs
+
+
+
+
+-----Candlepin - query database-----
+> Switch to postgres user
+[root@vrhsatp201 ~]# su - postgres
+Last login: Mon Jan 18 16:16:20 GMT 2016 on pts/1
+
+> Access Candlepin database
+-bash-4.2$ psql candlepin
+psql (9.2.18)
+Type "help" for help.
+
+> Run query
+candlepin=# select * from cp_consumer where uuid = 'e90d579f-3f9c-4f1f-b957-77c60fc00781'
+candlepin-# ;
+                id                |          created           |          updated           | autoheal | entitlementstatus |        name         | se
+rvicelevel | username |                 uuid                 | environment_id |        consumer_idcert_id        |            keypair_id            |
+             owner_id             | type_id | releasever |                       compliancestatushash                       |        lastcheckin
+
+----------------------------------+----------------------------+----------------------------+----------+-------------------+---------------------+---
+-----------+----------+--------------------------------------+----------------+----------------------------------+----------------------------------+
+----------------------------------+---------+------------+------------------------------------------------------------------+------------------------
+----
+ 2c9ebae653ec11aa0153f605ad1900d5 | 2016-04-08 14:18:00.473+01 | 2017-05-22 15:45:38.047+01 | t        | valid             | s2esx1e3.eu.nag.net |
+           |          | e90d579f-3f9c-4f1f-b957-77c60fc00781 | 2              | 2c9ebae653ec11aa0153f605afac00d9 | 2c9ebae653ec11aa0153f605af7f00d8 |
+ 2c9ebae6523c307101523c459a950003 | 1004    |            | 8515ce80889ad634d9d8ca485ca63e7e0f3f315b66935e6c712fb0f7032427bb | 2016-04-08 14:18:04.767
++01
+(1 row)
+
+
+candlepin=# SELECT * FROM cp_pool WHERE id='2c9ebae6567f6e9901567f9589541854';
+                id                |          created           |          updated           | accountnumber | activesubscription | contractnumber |
+      enddate         | productid |                                   productname                                   | quantity | restrictedtousername
+ |       startdate        | version |             owner_id             | sourceentitlement_id | ordernumber | derivedproductid | derivedproductname |
+     type      | quantity_consumed | quantity_exported
+----------------------------------+----------------------------+----------------------------+---------------+--------------------+----------------+--
+----------------------+-----------+---------------------------------------------------------------------------------+----------+---------------------
+-+------------------------+---------+----------------------------------+----------------------+-------------+------------------+--------------------+
+---------------+-------------------+-------------------
+ 2c9ebae6567f6e9901567f9589541854 | 2016-08-12 17:28:41.684+01 | 2016-12-29 09:54:04.943+00 | 1277066       | t                  | 10911742       | 2
+018-03-10 04:59:59+00 | RH00051   | Red Hat Enterprise Linux for Virtual Datacenters with Smart Management, Premium |       -1 |
+ | 2016-05-19 05:00:00+01 |       1 | 2c9ebae6523c307101523c459a950003 |                      | 20125219    |                  |                    |
+ STACK_DERIVED |                 0 |                 0
+(1 row)
+
+
+
+
+-----Yum repolist fails with - Peer's certificate issuer has been marked as not trusted by the user-----
+https://cdn.redhat.com/content/dist/rhel/server/7/7Server/x86_64/satellite/6.1/os/repodata/repomd.xml: [Errno 14] curl#60 - "Peer's certificate issuer has been marked as not trusted by the user."
+
+> Modify /etc/rhsm/rhsm.conf to the following
+repo_ca_cert = %(ca_cert_dir)sredhat-uep.pem
+
+
+
+
+-----Puppet-----
+> View puppet version
+# puppet --version
+
+
+
+
+-----Puppet - Certificates-----
+[/var/lib/puppet/ssl/ca/signed] - signed certificates on puppetmaster
+[/var/lib/puppet/ssl/ca/requests] - certificate requests on puppetmaster
+
+> List all signed puppet client certificates
+# puppet cert list --all
+
+> List outstanding puppet certificate requests
+# puppet cert list
+
+> Sign all outstanding puppet certificate requests
+# puppet cert sign --all
+
+> Error: The certificate retrieved from the master does not match the agent's private key.
+To fix this, remove the certificate from both the master and the agent and then start a puppet run, which will automatically regenerate a certficate.
+
+On the master:
+  puppet cert clean vrhaccu201.eu.nag.net
+On the agent:
+  rm -f /var/lib/puppet/ssl/certs/vrhaccu201.eu.nag.net.pem
+  puppet agent -t
+
+[root@vrhaccu201 ~]# puppet agent -t
+Exiting; no certificate found and waitforcert is disabled
+
+> Generate new cert from client
+# puppet certificate generate $(hostname -f) --ca-location remote  --ca_server vrhsatp201.eu.nag.net --verbose
+
+> Sign cert on puppet master
+# puppet cert sign --all
+
+
+
+
+-----Puppet - Satellite Out of sync hosts-----
+[root@s2togd10 ~]# puppet agent -tv
+Notice: Run of Puppet configuration client already in progress; skipping  (/var/lib/puppet/state/agent_catalog_run.lock exists)
+
+> Remove lock file
+# rm -f /var/lib/puppet/state/agent_catalog_run.lock
+
+> Run puppet apply
+# puppet agent -tv
+
+
+
+
+-----PXE boot process-----
+> When VM PXE boots, foreman-proxy creates a file in [/var/lib/tftpboot/pxelinux.cfg] named
+similar to MAC address of VM eth0.
+
+PXELinux template: Kickstart default PXELinux
+iPXE template: Kickstart default iPXE
+Finish template: Satellite Kickstart Default Finish
+User data template: Satellite Kickstart Default User Data
+kexec: Discovery Red Hat kexec
+Provisioning template: CYB RHEL 6
+
+
+
+
+-----Failed to auto provision host-----
+Failed to auto provision host vrhmdmp101.eu.nag.net: Medium CYB/Library/Red_Hat_Server/Red_Hat_Enterprise_Linux_6_Server_Kickstart_x86_64_6_8 does not belong to RedHat 6.8 operating system
+
+> Login to Satellite UI
+> Configure -> Host Groups -> CYB RHEL6 Site1 Prod -> Operating System
+> Change to the following
+Operating system: RHEL Server 6.7
+Partition table: CYB RHEL6
+
+
+
+
+-----Build stalled at 'Configuring puppet'-----
+> Login to Satellite UI
+> Hosts -> Provisioning Templates -> Kickstart default finish
+> Add Site1 and Site2 to location
+
+
+
+
+-----Installation Media-----
+> Satellite automatically creates installation media whenever a kickstart tree is synced.
+***You don't need to download ISO images
+Location: CYB/Library/Red_Hat_Server/Red_Hat_Enterprise_Linux_7_Server_Kickstart_x86_64_7_2
+URL: http://vrhsatp201.eu.nag.net/pulp/repos/CYB/Library/content/dist/rhel/server/7/7.2/x86_64/kickstart/
+
+---Sync kickstart trees---
+> Ensure the following repos are enabled in Content -> Red Hat Repositories -> Kickstarts
+> Check they appear in sync plans
+Red Hat Enterprise Linux 6 Server Kickstart x86_64 6.9
+Red Hat Enterprise Linux 7 Server Kickstart x86_64 7.4
+
+> After sync is complete, the latest kickstarts will appear under Hosts -> Installation media
+CYB/Library/Red_Hat_Server/Red_Hat_Enterprise_Linux_6_Server_Kickstart_x86_64_6_9
+CYB/Library/Red_Hat_Server/Red_Hat_Enterprise_Linux_7_Server_Kickstart_x86_64_7_4
+
+> Assign to [Provisioning Templates]. Hosts -> Provisioning Templates
+CYB RHEL6 -> Association -> Applicable Operating Systems -> RHEL Server 6.9
+CYB RHEL7 -> Association -> Applicable Operating Systems -> RedHat 7.4
+
+> Assign [Operating systems] to new media. Hosts -> Operating Systems -> RHEL 6.9
+Partition tables: CYB RHEL6, CYB RHEL6 Physical
+Installation media: CYB/Library/Red_Hat_Server/Red_Hat_Enterprise_Linux_6_Server_Kickstart_x86_64_6_9
+Provisioning template: CYB RHEL6
+
+> Assign Operating systems to new media. Hosts -> Operating Systems -> RHEL 7.4
+Partition tables: CYB RHEL7, CYB RHEL7 Physical
+Installation media: CYB/Library/Red_Hat_Server/Red_Hat_Enterprise_Linux_7_Server_Kickstart_x86_64_7_4
+Provisioning template: CYB RHEL7
+PXELinux template: Kickstart default PXELinux RHEL7
+
+> Update relevant [Host Groups] to new installation media
+
+
+
+
+-----Register RHEL 7 physical to Satellite-----
+> Build with ISO
+
+> Modify /etc/rhsm/rhsm.conf
+# Unified Entitlement Platform Configuration
+[server]
+# Server hostname:
+hostname = vrhsatp201.eu.nag.net
+
+# Server prefix:
+prefix = /rhsm
+
+# Server port:
+port = 443
+
+# Set to 1 to disable certificate validation:
+insecure = 0
+
+[rhsm]
+# Content base URL:
+baseurl= https://vrhsatp201.eu.nag.net/pulp/repos
+
+# Default CA cert to use when generating yum repo configs:
+repo_ca_cert = %(ca_cert_dir)skatello-server-ca.pem
+
+# Refresh repo files with server overrides on every yum command
+full_refresh_on_yum = 1
+
+
+> Install katello certs
+# rpm -ivh http://vrhsatp201.eu.nag.net/pub/katello-ca-consumer-latest.noarch.rpm
+
+> Register server to Satellite
+# subscription-manager register --org="CYB" --name="s2dec1.eu.nag.net" --activationkey="CYB RHEL7 Library"
+
+[root@s2dec1 ~]# subscription-manager register --org="CYB" --name="s2dec1.eu.nag.net" --activationkey="CYB RHEL7 Library"
+The system has been registered with ID: e1fe46dc-c650-4324-a3b0-16438e71f97f
+Installed Product Current Status:
+Product Name: Red Hat Enterprise Linux Server
+Status:       Not Subscribed
+Unable to find available subscriptions for all your installed products.
+
+[root@s2dec1 ~]# subscription-manager attach --auto
+Installed Product Current Status:
+Product Name: Red Hat Enterprise Linux Server
+Status:       Subscribed
+
+
+> Disable ISO repo
+# vi /etc/yum.repos.d/rhel7dvd.repo
+enabled=0
+
+> Install katello-agent and puppet
+# yum install puppet katello-agent -y
+
+> Add to /etc/puppet/puppet.conf
+[main]
+vardir = /var/lib/puppet
+logdir = /var/log/puppet
+rundir = /var/run/puppet
+ssldir = $vardir/ssl
+
+[agent]
+pluginsync      = true
+report          = true
+ignoreschedules = true
+daemon          = false
+ca_server       = vrhsatp201.eu.nag.net
+certname        = s2dec1.eu.nag.net
+environment     = KT_CYB_Library_CYB_RHEL7_puppet_14
+server          = vrhsatp201.eu.nag.net
+
+
+> Generate puppet certificate on s2dec1
+# puppet certificate generate $(hostname -f) --ca-location remote  --ca_server vrhsatp201.eu.nag.net --verbose
+Info: Creating a new SSL key for s2dec1.eu.nag.net
+Info: csr_attributes file loading from /etc/puppet/csr_attributes.yaml
+Info: Creating a new SSL certificate request for s2dec1.eu.nag.net
+Info: Certificate Request fingerprint (SHA256): FA:6D:72:7D:47:89:6D:85:D2:D6:FF:82:C5:33:2B:7E:6F:E1:D6:76:45:8C:36:3B:9B:E6:12:DE:B3:64:9C:C5
+Info: Caching certificate for ca
+Info: csr_attributes file loading from /etc/puppet/csr_attributes.yaml
+Info: Creating a new SSL certificate request for s2dec1.eu.nag.net
+Info: Certificate Request fingerprint (SHA256): FA:6D:72:7D:47:89:6D:85:D2:D6:FF:82:C5:33:2B:7E:6F:E1:D6:76:45:8C:36:3B:9B:E6:12:DE:B3:64:9C:C5
+Error: Error 400 on SERVER: s2dec1.eu.nag.net already has a requested certificate; ignoring certificate request
+Error: Try 'puppet help certificate generate' for usage
+
+> Sign certificate on puppet master (vrhsatp201)
+# puppet cert sign --all
+Notice: Signed certificate request for s2dec1.eu.nag.net
+Notice: Removing file Puppet::SSL::CertificateRequest s2dec1.eu.nag.net at '/var/lib/puppet/ssl/ca/requests/s2dec1.eu.nag.net.pem'
+
+# puppet cert sign --all
+Notice: Signed certificate request for s1dec1.eu.nag.net
+Notice: Removing file Puppet::SSL::CertificateRequest s1dec1.eu.nag.net at '/var/lib/puppet/ssl/ca/requests/s1dec1.eu.nag.net.pem'
+
+
+> Edit s2dec1.eu.nag.net in Hosts -> All Hosts
+-add vrhsatp201.eu.nag.net as content source
+
+> Run puppet on s2dec1
+# puppet agent -tv
+
+
+
+
+-----Migrate physical from Sat 5 to 6-----
+> Modify /etc/rhsm/rhsm.conf
+# Unified Entitlement Platform Configuration
+[server]
+# Server hostname:
+hostname = vrhsatp201.eu.nag.net
+
+# Server prefix:
+prefix = /rhsm
+
+# Server port:
+port = 443
+
+# Set to 1 to disable certificate validation:
+insecure = 0
+
+[rhsm]
+# Content base URL:
+baseurl= https://vrhsatp201.eu.nag.net/pulp/repos
+
+# Default CA cert to use when generating yum repo configs:
+repo_ca_cert = %(ca_cert_dir)skatello-server-ca.pem
+
+# Refresh repo files with server overrides on every yum command
+full_refresh_on_yum = 1
+
+
+> Install katello certs
+# rpm -ivh http://vrhsatp201.eu.nag.net/pub/katello-ca-consumer-latest.noarch.rpm
+
+> Register server to Satellite
+# subscription-manager register --org="CYB" --name="s2tels1.eu.nag.net" --activationkey="CYB RHEL6 Test"
+
+> Attach subscription
+# subscription-manager attach --auto
+
+> Install katello-agent and puppet **Disable nexus repo
+# yum install puppet katello-agent -y --disablerepo=nexus-dev
+
+> Add to
+# vi /etc/puppet/puppet.conf
+[main]
+vardir = /var/lib/puppet
+logdir = /var/log/puppet
+rundir = /var/run/puppet
+ssldir = $vardir/ssl
+
+[agent]
+pluginsync      = true
+report          = true
+ignoreschedules = true
+daemon          = false
+ca_server       = vrhsatp201.eu.nag.net
+certname        = s2tels1.eu.nag.net
+environment     = KT_CYB_Test_CYB_RHEL6_puppet_9
+server          = vrhsatp201.eu.nag.net
+
+
+> Add on Satellite UI
+Host group: CYB RHEL6 Site2 Test Migrated
+Content View: CYB RHEL6 composite
+Content Source: vrhsatp201.eu.nag.net
+Puppet CA: vrhsatp201.eu.nag.net
+Puppet Master: vrhsatp201.eu.nag.net
+Openscap Capsule: vrhsatp201.eu.nag.net
+
+
+> Generate puppet certificate on s2tels1
+# puppet certificate generate $(hostname -f) --ca-location remote  --ca_server vrhsatp201.eu.nag.net --verbose
+
+> Sign certificate on vrhsatp201
+# puppet cert sign --all
+Notice: Signed certificate request for s2tels1.eu.nag.net
+Notice: Removing file Puppet::SSL::CertificateRequest s2tels1.eu.nag.net at '/var/lib/puppet/ssl/ca/requests/s2tels1.eu.nag.net.pem'
+
+> Run puppet
+# puppet agent -tv
+
+
+---Cleanup---
+There is no command to specifically unregister a system which is registered with RHN Classic.
+# rm -rf /etc/sysconfig/rhn/systemid
+
+> Remove Sat 5 packages
+# yum erase rhncfg rhncfg-actions rhncfg-client osad
+
+> Disable plugin check
+# sed -i 's/enabled.*/enabled = 0/' /etc/yum/pluginconf.d/rhnplugin.conf
+or
+# vi /etc/yum/pluginconf.d/rhnplugin.conf
+[main]
+enabled = 0
+
+> Delete from s2sat1
+
+
+
+
+-----Migrate to Sat 6-----
+> To delete the registration locally, remove the file with the system ID assigned to the system when it was registered:
+There is no command to specifically unregister a system which is registered with RHN Classic.
+# rm -rf /etc/sysconfig/rhn/systemid
+
+> Remove Sat 5 packages
+# yum erase rhncfg rhncfg-actions rhncfg-client osad
+
+> Disable plugin check
+# sed -i 's/enabled.*/enabled = 0/' /etc/yum/pluginconf.d/rhnplugin.conf
+or
+# vi /etc/yum/pluginconf.d/rhnplugin.conf
+[main]
+enabled = 0
+
+> Register to Satellite 6
+# subscription-manager register --org="CYB" --activationkey="CYB RHEL6 Prod"
+
+> Attach subscription
+# subscription-manager attach --pool 2c9ebae65c5db82d015c5e3e71bf30ed
+Successfully attached a subscription for: Red Hat Enterprise Linux for Virtual Datacenters with Smart Management, Premium
+
+> Start service and enable puppet
+# service puppet start
+# chkconfig puppet on
+
+> Report to Satellite
+# puppet agent -tv
+
+
+
+
+-----Migrate back to Sat 5-----
+> Re-register to Sat 5
+[root@vrhriap101 ~]# rhnreg_ks --serverUrl=https://s2sat1.eu.nag.net/XMLRPC --sslCACert=/usr/share/rhn/RHN-ORG-TRUSTED-SSL-CERT --activationkey=1-74990f535a188b2c27aea2f2d0569003,1-dmz_prod01_rhel6
+Package gtk2-engines-2.18.4-5.el6.x86_64 already installed and latest version
+Package libXmu-1.1.1-2.el6.x86_64 already installed and latest version
+Package SYMCquiesce-1.0.0-001.x86_64 already installed and latest version
+
+> Unregister from Sat 6
+[root@vrhriap101 ~]# subscription-manager identity
+server type: RHN Classic and Red Hat Subscription Management
+system identity: 6189826e-6e33-4000-8cca-342996177c3e
+name: vrhriap101.eu.nag.net
+org name: CYB
+org ID: CYB
+environment name: Prod/CYB_RHEL6_composite
+
+[root@vrhriap101 ~]# subscription-manager unregister
+Message from syslogd@vrhriap101 at Jun  8 10:41:49 ...
+ <30>goferd: [INFO][worker-0] root:490 - connecting to vrhsatz101.eu.nag.net:5647...
+System has been unregistered.
+
+> Stop and disable puppet
+[root@vrhriap101 ~]# service puppet stop
+Stopping puppet agent:                                     [  OK  ]
+[root@vrhriap101 ~]# chkconfig puppet off
+Message from syslogd@vrhriap101 at Jun  8 10:42:01 ...
+ <30>goferd: [INFO][Thread-3] root:490 - connecting to vrhsatz101.eu.nag.net:5647...
+t
+Message from syslogd@vrhriap101 at Jun  8 10:42:01 ...
+ <30>goferd: [INFO][Thread-3] root:512 - connected to vrhsatz101.eu.nag.net:5647
+
+ [root@vrhriap101 ~]# yum repolist
+Loaded plugins: package_upload, product-id, rhnplugin, search-disabled-repos, security, subscription-manager
+This system is receiving updates from RHN Classic or RHN Satellite.
+repo id                                                        repo name                                                      status
+dmz_prod01_custom                                              dmz_prod01_custom                                                 124
+dmz_prod01_esx_el6_64                                          dmz_prod01_esx_el6_64                                              85
+dmz_prod01_rhel6                                               dmz_prod01_rhel6                                               19,432
+dmz_prod01_rhel6_tools                                         dmz_prod01_rhel6_tools                                            137
+
+
+
+
+-----Remote-Execution-----
+> Content -> Job Templates
+
+Job template: Run Command - SSH Default
+
+Search Query: name ~ s*
+
+Command: subscription-manager repos --disable rhel-6-server-satellite-tools-6.1-rpms; subscription-manager repos --enable rhel-6-server-satellite-tools-6.2-rpms; yum upgrade katello-agent
+
+Schedule: Execute now
+
+Submit
+
+
+
+
+-----Pulp Manually Sync latest errata-----
+> Navigate to Content -> Sync Status
+> Select Product, tick and 'Synchronize Now'
+
+
+
+
+-----Unable to Sync Repositories after Pulp DB import-----
+> Modify /etc/pulp/server.conf
+[data_reaping]
+# reaper_interval: 0.25
+# repo_sync_history: 60
+
+[data_reaping]
+reaper_interval: 0.0006944
+repo_sync_history: 30
+
+> Restart katello-service
+
+> Revert changes after several mins
+
+> Restart katello-service
+
+> Initiate manual pulp repo sync
+Content -> Sync Plans -> highlight repos -> Synchronize Now
+
+
+
+
+-----Upload RPM to Repository-----
+> Retrieve repository ID from vrhsatp201
+# hammer repository list --organization "CYB" | grep -i cyb
+
+> Copy packages to vrhsatp201 (Satellite server)
+# for i in $(cat /coe/x/tmp/mq84.rpms_sam); do cp /coe/x/Repository/external/IBM/MQ/8.0.0.4/$i-8.0.0-4.x86_64.rpm .; done
+
+> Copy directories to vrhsatp201
+# cp -a MQ* /tmp
+
+> Upload single package to Satellite using hammer.
+[root@vrhsatp201 sam]# hammer repository upload-content --organization "CYB" --id 283 --path /tmp/sam/MQSeriesSDK-U8004-8.0.0-4.x86_64.rpm
+Successfully uploaded file 'MQSeriesSDK-U8004-8.0.0-4.x86_64.rpm'.
+
+> Upload multiple packages to Satellite using hammer.
+[root@vrhsatp201 sam]# hammer repository upload-content --organization "CYB" --id 283 --path /tmp/sam/
+Successfully uploaded file 'MQSeriesClient-U8004-8.0.0-4.x86_64.rpm'.
+Successfully uploaded file 'MQSeriesGSKit-U8004-8.0.0-4.x86_64.rpm'.
+Successfully uploaded file 'MQSeriesJRE-U8004-8.0.0-4.x86_64.rpm'.
+Successfully uploaded file 'MQSeriesJava-U8004-8.0.0-4.x86_64.rpm'.
+Successfully uploaded file 'MQSeriesMan-U8004-8.0.0-4.x86_64.rpm'.
+Successfully uploaded file 'MQSeriesRuntime-U8004-8.0.0-4.x86_64.rpm'.
+Successfully uploaded file 'MQSeriesSamples-U8004-8.0.0-4.x86_64.rpm'.
+Successfully uploaded file 'MQSeriesServer-U8004-8.0.0-4.x86_64.rpm'.
+
+**A composite view contains other content views.
+
+> On Satellite GUI, navigate to Content -> Content Views
+> 'Publish New Version' of CYB RHEL6 rpm
+> Add description then Save. *Take note of new version no.
+
+> Select 'CYB RHEL6 composite' -> Content Views -> List/Remove
+> Click on 'CYB RHEL6 rpm' and select new version from drop-down.
+> 'Publish New version' of CYB RHEL6 composite
+
+When Publishing is complete
+> Select 'CYB RHEL6 rpm' -> Promote new version to Test.
+> Select 'CYB RHEL6 composite' to Test
+
+
+
+
+-----Configure Proxy for HTTP connections-----
+> Edit /etc/rhsm/rhsm.conf
+
+# Unified Entitlement Platform Configuration
+[server]
+# Server hostname:
+hostname = subscription.rhsm.redhat.com
+
+# Server prefix:
+prefix = /subscription
+
+# Server port:
+port = 443
+
+# Set to 1 to disable certificate validation:             ***Change to 1 if certificate validation errors displayed.
+insecure = 0
+
+# an http proxy server to use
+proxy_hostname =www-cache.eu.nag.net
+
+# port for http proxy server
+proxy_port =3128
+
+# user name for authenticating to an http proxy, if needed
+proxy_user =redhatupdateservprod
+
+# password for basic http proxy auth, if needed
+proxy_password =Nw1Pe46b
+
+[rhsm]
+# Content base URL:
+baseurl= https://vrhsatp201.eu.nag.net/pulp/repos
+
+> Run satellite-installer to enable proxy settings in katello
+# satellite-installer --katello-proxy-url=http://www-cache.eu.nag.net --katello-proxy-port=3128
+
+> Check all files are configured correctly.
+[root@vrhsatp201 ~]# cat /etc/pulp/server/plugins.conf.d/puppet_importer.json
+{
+        "proxy_host": "http://127.0.0.1",
+
+        "proxy_port": 4827,
+
+        "proxy_username": "redhatupdateservprod",
+
+        "proxy_password": "Nw1Pe46b"
+
+}
+
+[root@vrhsatp201 ~]# cat /etc/pulp/server/plugins.conf.d/iso_importer.json
+{
+        "proxy_host": "http://127.0.0.1",
+
+        "proxy_port": 4827,
+
+        "proxy_username": "redhatupdateservprod",
+
+        "proxy_password": "Nw1Pe46b"
+
+}
+
+[root@vrhsatp201 ~]# cat /etc/pulp/server/plugins.conf.d/yum_importer.json
+{
+    "proxy_host": "http://www-cache.eu.nag.net",
+
+    "proxy_port": 3128,
+
+    "proxy_username": "redhatupdateservprod",
+    "proxy_password": "Nw1Pe46b"
+}
+
+[root@vrhsatp201 ~]# cat /etc/foreman/plugins/katello.yaml
+{
+    "proxy_host": "http://www-cache.eu.nag.net",
+
+    "proxy_port": 3128,
+
+    "proxy_username": "redhatupdateservprod",
+    "proxy_password": "Nw1Pe46b"
+}
+
+
+
+
+-----virt-who and CDN connections not running in parallel-----
+> Stop virt-who service
+# systemctl stop virt-who
+
+> Append to /etc/sysconfig/virt-who
+NO_PROXY=*
+
+> Run virt-who with no proxy
+# NO_PROXY=* virt-who -o -d
+
+> Restart virt-who service
+# systemctl restart virt-who
+
+-----
+
+Alternative solution:
+
+> Install tinyproxy from EPEL repo
+# yum install tinyproxy
+
+> Start and enable service
+# systemctl start tinyproxy
+# systemctl enable tinyproxy
+
+> Tinyproxy listens on 8888 by default
+# netstat -tulpn | grep -i 8888
+
+> Append to [/etc/virt-who.d/vcenter1] and [/etc/virt-who.d/vcenter2]
+rhsm_proxy_hostname=127.0.0.1
+rhsm_proxy_port=8888
+
+> Check virt-who log progress
+# tail -f /var/log/rhsm/rhsm.log
+
+
+Fixed by errata (https://access.redhat.com/errata/RHBA-2017:1614)
+> virt-who will not run on Satellite server if it's CDN registered and proxy settings configured in /etc/rhsm/rhsm.conf
+> Options were to deploy separate server for virt-who only or change back to self-registered or second squid instance
+
+
+
+
+-----virt-who-----
+Config files
+
+[/etc/sysconfig/virt-who]
+[/etc/virt-who.d/vcenter1]
+[/etc/virt-who.d/vcenter2]
+
+[vcenter1]
+type=esx
+server=vapvcsap101.eu.nag.net
+username=NAG-EUR\Srv-CloudForms
+password=It3*Dq8*Or5*Ts7*
+owner=CYB
+env=Library
+hypervisor_id=hostname
+rhsm_hostname=vrhsatp201.eu.nag.net
+rhsm_username=virtwho
+rhsm_password=virtwho1
+rhsm_prefix=/rhsm
+
+[vcenter2]
+type=esx
+server=vapvcsap201.eu.nag.net
+username=NAG-EUR\Srv-CloudForms
+password=It3*Dq8*Or5*Ts7*
+owner=CYB
+env=Library
+hypervisor_id=hostname
+rhsm_hostname=vrhsatp201.eu.nag.net
+rhsm_username=virtwho
+rhsm_password=virtwho1
+rhsm_prefix=/rhsm
+
+
+> virt-who is running
+[root@vrhsatp201 ~]# virt-who --one-shot
+2017-07-04 13:02:00,069 INFO: Using configuration "vcenter2" ("esx" mode)
+2017-07-04 13:02:00,069 INFO: Using configuration "vcenter1" ("esx" mode)
+2017-07-04 13:02:00,069 INFO: Using reporter_id='vrhsatp201.eu.nag.net-8b5a5e22951f41149ce1d61b66ff978d'
+2017-07-04 13:02:10,716 INFO: Sending update in hosts-to-guests mapping for config "vcenter1": 34 hypervisors and 745 guests found
+2017-07-04 13:02:23,275 INFO: Sending update in hosts-to-guests mapping for config "vcenter2": 66 hypervisors and 1994 guests found
+
+> Run virt-who in debug mode
+[root@vrhsatp201 virt-who.d]# virt-who -d -o
+2017-06-29 16:55:53,773 [INFO] @main.py:160 - Using configuration "vcenter1" ("esx" mode)
+2017-06-29 16:55:53,774 [INFO] @main.py:160 - Using configuration "vcenter2" ("esx" mode)
+2017-06-29 16:55:53,774 [INFO] @main.py:162 - Using reporter_id='vrhsatp201.eu.nag.net-8b5a5e22951f41149ce1d61b66ff978d'
+2017-06-29 16:55:57,526 [INFO] @subscriptionmanager.py:195 - Sending update in hosts-to-guests mapping for config "vcenter1": 34 hypervisors and 743 guests found
+2017-06-29 16:56:02,499 [INFO] @subscriptionmanager.py:195 - Sending update in hosts-to-guests mapping for config "vcenter2": 67 hypervisors and 1967 guests found
+
+***If virt-who is overloaded, changing interval from 60s to 3600s
+
+
+> Virt who config as generated 
+[root@vrhsatp201 ~]# cat /etc/virt-who.d/vcenter1
+[vcenter1]
+type=esx
+hypervisor_id=hostname
+owner=CYB
+env=Library
+server=vapvcsap101.eu.nag.net
+username=NAG-EUR\Srv-CloudForms
+encrypted_password=e65f69672167079ed965a7937261f96ff141c094e2585915ddd5fbef4afbb60d
+rhsm_hostname=vrhsatp201.eu.nag.net
+rhsm_username=virtwho
+rhsm_encrypted_password=223591250ab5ca7d1a7d69162e9a3d02
+rhsm_prefix=/rhsm
+
+[root@vrhsatp201 ~]# cat /etc/virt-who.d/vcenter2
+[vcenter2]
+type=esx
+hypervisor_id=hostname
+owner=CYB
+env=Library
+server=vapvcsap201.eu.nag.net
+username=NAG-EUR\Srv-CloudForms
+encrypted_password=e65f69672167079ed965a7937261f96ff141c094e2585915ddd5fbef4afbb60d
+rhsm_hostname=vrhsatp201.eu.nag.net
+rhsm_username=virtwho
+rhsm_encrypted_password=223591250ab5ca7d1a7d69162e9a3d02
+rhsm_prefix=/rhsm
+
+
+
+
+-----virt-who generate encrypted password-----
+> Input any password into utility
+# virt-who-password
+Password:
+
+
+username=NAG-EUR\Srv-CloudForms
+encrypted_password=e65f69672167079ed965a7937261f96ff141c094e2585915ddd5fbef4afbb60d
+
+rhsm_username=virtwho
+rhsm_encrypted_password=223591250ab5ca7d1a7d69162e9a3d02
+
+rhsm_username=foreadmin
+rhsm_encrypted_password=58baec277db0a766ae0803e62120d523
+
+
+
+
+-----PostgreSQL-----
+> Switch to postgres user
+# su postgres
+
+> Access individual database
+# psql foreman
+# psql candlepin
+candlepin=# select name from cp_consumer where name like '%virt%';
+ name
+------
+(0 rows)
+
+
+
+
+-----Unable to activate Satellite 6.2 repository-----
+[root@vrhsatp201 ~]# subscription-manager repos --enable rhel-7-server-satellite-6.2-rpms
+Error: rhel-7-server-satellite-6.2-rpms is not a valid repository ID. Use --list option to see valid repositories.
+
+> Disabled Satellite 6.1 repos
+[root@vrhsatp201 ~]# subscription-manager repos --disable=rhel-7-server-satellite-6.1-rpms
+Repository 'rhel-7-server-satellite-6.1-rpms' is disabled for this system.
+[root@vrhsatp201 ~]# subscription-manager repos --disable rhel-7-server-satellite-tools-6.1-rpms
+Repository 'rhel-7-server-satellite-tools-6.1-rpms' is disabled for this system.
+
+> Logged on to Sat6 GUI. Content -> Red Hat Repositories -> RPMs -> Red Hat Satellite 6.2 (for RHEL 7 Server) (RPMs). Enabled the following repos
+Red Hat Satellite 6.2 (for RHEL 7 Server) (RPMs)
+
+
+> Enabled repository in Satellite
+[root@vrhsatp201 ~]# subscription-manager repos --enable rhel-7-server-satellite-6.2-rpms
+Repository 'rhel-7-server-satellite-6.2-rpms' is enabled for this system.
+
+[root@vrhsatp201 ~]# subscription-manager repos --list-enabled
+Repo ID:   rhel-7-server-satellite-6.2-rpms
+Repo Name: Red Hat Satellite 6.2 (for RHEL 7 Server) (RPMs)
+Repo URL:  https://vrhsatp201.eu.nag.net/pulp/repos/CYB/Library/content/dist/rhel/server/7/7Server/$basearch/satellite/6.2/os
+Enabled:   1
+
+
+
+
+-----Switch between Old/New Satellite servers for Builds-----
+> Stop dhcpd on Sat6
+[root@vrhsatu201 ~]# systemctl stop dhcpd.service
+
+
+> To pick up PXE boot from Sat5.6 server, ensure dhcpd is running.
+[root@s2sat1 ~]# service dhcpd start
+Starting dhcpd:                                            [  OK  ]
+
+[root@s2sat1 ~]# service dhcpd status
+dhcpd (pid  5259) is running...
+
+Build VLANs
+172.29.152.51	s2sat1-hil-build	#Hilington Linux build VLAN s2sat1 interface
+#172.29.152.60 - 172.29.152.70		Hillington Linux build VLAN DHCP scope - s2sat1
+
+172.29.56.51	s1sat1-bun-build	#Bunker Linux build VLAN s1sat1 interface
+#172.29.56.60 - 172.29.56.70		#Bunker Linux build VLAN DHCP scope - s1sat1
+
+
+
+
+-----Elasticsearch high CPU utilisation-----
+https://access.redhat.com/solutions/1193883
+
+> Clear existing elasticsearch indices, and restart services:
+# tar -czvf /root/elasticsearch.tar.gz /var/lib/elasticsearch/ 
+# rm -rf /var/lib/elasticsearch/*
+# katello-service restart
+
+> Initiate the re-indexing of all content with:
+# foreman-rake katello:reindex
+
+
+
+
+================================================
+-----SATELLITE BUILD-----
+================================================
+
+
+-----Download Satellite packages-----
+> Log on to https://access.redhat.com/downloads/
+> Download Satellite 6.2 Binary DVD
+> Extract ISO image and all files will be available under 'Packages' directory
+
+
+
+
+-----Register New Satellite with RHSM-----
+> Modify /etc/rhsm/rhsm.conf
+hostname=subscription.rhsm.redhat.com
+prefix=/subscription
+baseurl=https://cdn.redhat.com
+repo_ca_cert = %(ca_cert_dir)sredhat-uep.pem
+
+> Register Satellite
+[root@vrhsatp202 rhsm]# subscription-manager register --force --activationkey=satellite-temp --org 5999999
+The system has been registered with ID: 170db845-099e-4616-adcb-952cdafad790
+
+Installed Product Current Status:
+Product Name: Red Hat Enterprise Linux Server
+Status:       Subscribed
+
+
+
+
+-----Certificate Renewal Sat6-----
+> Satellite customers can use the self-service Satellite Certificate generation tool in the Customer Portal
+by logging in as an Organizational Administrator user.
+> Navigate to Subscriptions -> Subscription Management -> Subscription Management Applications -> Satellite tab
+> Choose or create a Satellite subscription management application
+SIDE NOTE: Aside from generating the certificate, Satellite 5.x servers running in connected mode need to be registered (rhn_register) and activated (rhn-satellite-activate) against RHN Classic Hosted, not Customer Portal Subscription Management.
+
+
+
+
+-----Certificate Bundles for Guests-----
+[/etc/pki/tls/certs/]
+lrwxrwxrwx  1 root root   49 Feb 27 11:07 ca-bundle.crt -> /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+lrwxrwxrwx  1 root root   55 Feb 27 11:07 ca-bundle.trust.crt -> /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt
+
+
+
+
+-----Migrate VM from Sat 5.6 to Sat 6-----
+> List puppet certificate list
+[root@vrhsatp201 ~]# puppet cert list
+  "vrhwast5" (SHA256) 2F:CC:0D:20:E6:13:32:7F:04:33:8E:35:E0:DC:7D:89:24:EC:E8:FB:55:F8:2D:AD:50:14:6A:44:E8:17:B4:61
+
+> Sign puppet
+[root@vrhsatp201 ~]# puppet cert sign --digest SHA1 vrhwast5
+Notice: Signed certificate request for vrhwast5
+Notice: Removing file Puppet::SSL::CertificateRequest vrhwast5 at '/var/lib/puppet/ssl/ca/requests/vrhwast5.pem'
+
+
+---On the server that you are migrating---
+> Install git
+# yum -y install git
+
+> Clone git repo
+# git clone http://vrhsatp101:3000/open_systems_support/scripts.git
+
+> Navigate to Satellite directory
+cd scripts/Satellite6/
+./sat6_migration.sh
+The above script will carry out the following actions:
+  - updates a couple of packages (e.g. yum, subscription-manager)
+  - creates a host record in Satellite6 using the Foreman API
+  - registers the server via RHSM (subscription-manager “register”)
+  - installs puppet and katello-agent and some other supporting tools (gofer, facter, hammer etc)
+  - populates the puppet agent config (/etc/puppet/puppet.conf)
+
+
+---On vrhsatp201---
+> List puppet certificates
+# puppet cert list
+
+> Sign puppet certificates
+# puppet cert sign --all
+
+
+---On the server that you are migrating---
+> Apply puppet
+# puppet agent apply –tv
+
+> Run disable puppet script
+# /root/scripts/Satellite6/puppet_disable.sh
+The above script will carry out the following actions:
+  - disables the puppet/gofer services chkconfig)
+  - stops the puppet/gofer services
+
+
+Post-migration run the following checks – 
+# subscription-manager status  (should show “Subscribed”)
+# yum repolist				   (should show the Satellite6/RHSM repos)
+> Log on to the Satellite6 admin console, navigate to the Hosts page, drill down into the server and click on the Reports button. 
+> You should see a list of the changes that Puppet would have made if the config was being applied for real (i.e. without the “noop parameter”).
+
+> Final step is to delete the system profile from s2sat1 via the Satellite5 GUI.
+
+
+
+
+-----Unable to access all Sat6 repos-----
+[root@vrhdpu01 Satellite6]# yum repolist
+Loaded plugins: package_upload, product-id, rhnplugin, security, subscription-manager
+*** WARNING ***
+The subscription for following product(s) has expired:
+  - Oracle Java (for RHEL Server)
+  - Oracle Java (for RHEL Workstation)
+  - Red Hat Beta
+  - Red Hat Developer Toolset (for RHEL Server)
+  - Red Hat EUCJP Support (for RHEL Server) - Extended Update Support
+  - Red Hat Enterprise Linux High Availability (for RHEL Server) - Extended Update Support
+  - Red Hat Enterprise Linux High Performance Networking (for RHEL Server) - Extended Update Support
+  - Red Hat Enterprise Linux Load Balancer (for RHEL Server) - Extended Update Support
+  - Red Hat Enterprise Linux Resilient Storage (for RHEL Server) - Extended Update Support
+  - Red Hat Enterprise Linux Scalable File System (for RHEL Server) - Extended Update Support
+  - Red Hat Enterprise Linux Server
+  - Red Hat Enterprise Linux Server - Extended Update Support
+  - Red Hat S-JIS Support (for RHEL Server) - Extended Update Support
+  - Red Hat Software Collections (for RHEL Server)
+  - Red Hat Software Collections Beta (for RHEL Server)
+You no longer have access to the repositories that provide these products.  It is important that you apply an active subscription in order to resume access to security and other critical updates. If you don't have other active subscriptions, you can renew the expired subscription.
+https://vrhsatp201.eu.nag.net/pulp/repos/CYB/Library/CYB_RHEL6_6_locked/custom/CYB_RHEL6/CYB_RHEL6_pkgs/repodata/repomd.xml: [Errno 14] PYCURL ERROR 22 - "The requested URL returned error: 404"
+
+
+[root@vrhdpu01 Satellite6]# curl https://vrhsatp201.eu.nag.net/pulp/repos/CYB/Library/CYB_RHEL.xml
+curl: (60) Peer certificate cannot be authenticated with known CA certificates
+More details here: http://curl.haxx.se/docs/sslcerts.html
+
+curl performs SSL certificate verification by default, using a "bundle"
+ of Certificate Authority (CA) public keys (CA certs). If the default
+ bundle file isn't adequate, you can specify an alternate file
+ using the --cacert option.
+If this HTTPS server uses a certificate signed by a CA represented in
+ the bundle, the certificate verification probably failed due to a
+ problem with the certificate (it might be expired, or the name might
+ not match the domain name in the URL).
+If you'd like to turn off curl's verification of the certificate, use
+ the -k (or --insecure) option.
+
+> Register with Sat 5
+# rhnreg_ks --serverUrl=https://s2sat1.eu.nag.net/XMLRPC --sslCACert=/usr/share/rhn/RHN-ORG-TRUSTED-SSL-CERT --activationkey=1-74990f535a188b2c27aea2f2d0569003,1-dev01_rhel6
+
+
+[/etc/pki/tls/certs/]
+> Replace bundle certs with copy from vrhosst1
+[root@vrhdpu01 certs]# mv ca-bundle.crt ca-bundle.crt.old
+[root@vrhdpu01 certs]# mv ca-bundle.trust.crt ca-bundle.trust.crt.old
+[root@vrhdpu01 certs]# ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ca-bundle.crt
+[root@vrhdpu01 certs]# ln -s /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt ca-bundle.trust.crt
+
+> Remove all subscriptions
+# subscription-manager remove --all
+
+> Remove all local system and subscription data without affecting the server
+# subscription-manager clean
+
+> Run migration script
+# ./sat6_migration_virtual
+
+The system has been registered with ID: d71983c5-7bb5-4959-a7c0-bd5e251f0622
+
+> Update subscription data
+# subscription-manager refresh
+
+*If puppet install fails, re-install
+# yum erase -y puppet
+# yum install -y puppet
+
+> Update puppet config
+# vi /etc/puppet/puppet.conf
+[main]
+vardir = /var/lib/puppet
+logdir = /var/log/puppet
+rundir = /var/run/puppet
+ssldir = $vardir/ssl
+
+[agent]
+pluginsync      = true
+report          = true
+ignoreschedules = true
+daemon          = false
+ca_server       = vrhsatp201.eu.nag.net
+certname        = vrhdpu01.eu.nag.net
+environment     = KT_CYB_Test_CYB_RHEL6_puppet_9
+server          = vrhsatp201.eu.nag.net
+
+
+> Force apply puppet agent
+# puppet agent apply -tv
+Info: Caching certificate for ca
+Info: csr_attributes file loading from /etc/puppet/csr_attributes.yaml
+Info: Creating a new SSL certificate request for vrhdpu01.eu.nag.net
+Info: Certificate Request fingerprint (SHA256): 48:85:B8:37:81:97:96:1E:38:9B:63:3A:A2:3B:CB:8E:98:EE:56:5D:0E:10:82:EC:04:0F:5B:20:0C:36:EC:E5
+Info: Caching certificate for ca
+Exiting; no certificate found and waitforcert is disabled
+
+> Sign certificate on Sat6 server
+[root@vrhsatp201 ~]# puppet cert list
+  "vrhdpu01.eu.nag.net" (SHA256) 48:85:B8:37:81:97:96:1E:38:9B:63:3A:A2:3B:CB:8E:98:EE:56:5D:0E:10:82:EC:04:0F:5B:20:0C:36:EC:E5
+
+[root@vrhsatp201 ~]# puppet cert sign --all
+Notice: Signed certificate request for vrhdpu01.eu.nag.net
+Notice: Removing file Puppet::SSL::CertificateRequest vrhdpu01.eu.nag.net at '/var/lib/puppet/ssl/ca/requests/vrhdpu01.eu.nag.net.pem'
+
+
+
+
+-----Satellite API-----
+> Accessible from  https://satellite_hostname/apidoc
+
+
+
+
+-----MongoDB-----
+> Manage services
+# systemctl start mongod
+# systemctl stop mongod
+
+> Access MongoDB pulp database
+# mongo pulp_database
+MongoDB shell version: 2.6.12
+connecting to: pulp_database
+Welcome to the MongoDB shell.
+For interactive help, type "help".
+For more comprehensive documentation, see
+        http://docs.mongodb.org/
+Questions? Try the support group
+        http://groups.google.com/group/mongodb-user
+
+> db.migration_trackers.find()
+{ "_id" : ObjectId("57502f6110e37d7cc8d03466"), "version" : 0, "name" : "pulp_rpm.plugins.migrations" }
+{ "_id" : ObjectId("57ece78557cf77463ed11180"), "name" : "pulp_docker.plugins.migrations", "version" : 2, "_ns" : "migration_trackers" }
+{ "_id" : ObjectId("57502f6110e37d7cc8d03465"), "version" : 24, "name" : "pulp.server.db.migrations", "_ns" : "migration_trackers" }
+{ "_id" : ObjectId("57502f6110e37d7cc8d03467"), "version" : 5, "name" : "pulp_puppet.plugins.migrations", "_ns" : "migration_trackers" }
+
+> db.units_rpm.count()
+0
+> db.units_erratum.count()
+0
+
+> exit
+bye
+
+
+
+
+-----Consistent Network Device Naming (CNDN)-----
+> RHEL 7 does not name interfaces eth0/1/2 but selects random names which can change at reboot
+
+> Disable CNDN. This adds the kernel parameter "net.ifnames=0"
+# /sbin/grubby --args="net.ifnames=0" --update-kernel=ALL
+
+> Reboot server. Interfaces should now display as eth0, eth1
+
+> Rename interface files
+# mv /etc/sysconfig/network-scripts/ifcfg-ens192 /etc/sysconfig/network-scripts/ifcfg-eth0  
+# mv /etc/sysconfig/network-scripts/ifcfg-ens224 /etc/sysconfig/network-scripts/ifcfg-eth1
+
+> Modify interface files
+# vi /etc/sysconfig/network-scripts/ifcfg-eth0
+# vi /etc/sysconfig/network-scripts/ifcfg-eth1
+
+> Restart interfaces
+# ifdown eth0
+# ifdown eth1
+
+# ifup eth0
+# ifup eth1
+
+> Check NDM config
+# nmcli con show
+NAME  UUID                                  TYPE            DEVICE
+eth0  de38764e-448f-49a3-a940-0c215935889c  802-3-ethernet  eth0
+
+
+> If error appears in log, che
+# /var/log/foreman-installer/capsule.log
+[ERROR 2017-03-17 09:53:38 main]  Could not get the ip address from fact ipaddress_ens192 at /usr/share/foreman-installer/modules/foreman_proxy/manifests/proxydhcp.pp:8 on node vrhsatp101.eu.nag.net
+
+
+> Check default interfaces in satellite-installer (6.2) or katello-installer (6.1)
+# satellite-installer --help
+--dhcp-interface              DHCP listen interface (default: "ens192")
+--dns-interface               DNS interface (default: "ens192")
+
+# katello-installer --help
+--capsule-dhcp-interface      DHCP listen interface (default: "ens192")
+--capsule-dns-interface       DNS interface (default: "ens192")
+
+> Update katello installation due to CNDN change
+# satellite-installer --scenario capsule --dhcp-interface=eth0
+# satellite-installer --scenario capsule --dns-interface=eth0
+# satellite-installer --scenario capsule --dhcp-nameservers=172.29.56.75
+# satellite-installer --scenario capsule --dns-forwarders=172.29.56.75
+
+# katello-installer --capsule-dhcp-interface=eth0
+# katello-installer --capsule-dns-interface=eth0
+
+
+> Check default interfaces in satellite-installer (6.2) or katello-installer (6.1)
+# satellite-installer --help
+--dhcp-interface              DHCP listen interface (default: "eth0")
+--dns-interface               DNS interface (default: "eth0")
+
+# katello-installer --help
+--capsule-dhcp-interface      DHCP listen interface (default: "eth0")
+--capsule-dns-interface       DNS interface (default: "eth0")
+
+
+[root@vrhsatp202 network-scripts]# cat ifcfg-eth1
+TYPE=Ethernet
+BOOTPROTO=none
+DEFROUTE=yes
+PEERDNS=yes
+PEERROUTES=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+IPV6_FAILURE_FATAL=no
+NAME=eth1
+UUID=8b249d50-cfb5-45ab-9689-cf71e97b2e22
+DEVICE=eth1
+ONBOOT=yes
+IPADDR=172.31.42.224
+DNS1=172.30.234.100
+DNS2=172.30.233.100
+NETMASK=255.255.254.0
+GATEWAY=172.31.42.1
+
+
+
+
+-----Install Satellite with ISO image-----
+# mount -o loop /coe/x/Repository/external/RedHat/satellite-6.1.1-rhel-7-x86_64-dvd.iso /media/iso
+# cd /media/iso
+# ./install_packages
+
+
+
+
+-----Satellite minor version upgrade 6.1.9 to 6.1.11 Self-registered Satellite-----
+> Stop services, take VMware snapshot
+# katello-service stop
+
+**Take snapshot
+
+> Start services
+# katello-service start
+
+> List enabled repos. Should have rhel-7-server-satellite-tools-6.1-rpms repo
+# subscription-manager repos --list-enabled
+
+> Download packages before stopping Satellite server
+# yum update --downloadonly
+
+> If above step fails due to dependency issues, disable EPEL repo then run re-run above step.
+# subscription-manager repos --disable CYB_EPEL_RHEL7_EPEL
+Repository 'CYB_EPEL_RHEL7_EPEL' is disabled for this system.
+
+> Stop services
+# katello-service stop
+
+> Update all packages
+# yum update
+
+> Reboot server
+# reboot
+
+> Upgrade Satellite
+# katello-installer --upgrade
+
+> Restart goferd service
+# systemctl restart goferd
+
+
+
+
+-----Create /backup filesystem for katello-backup---
+> Create LV
+[root@vrhsatp202 ~]# lvcreate -n lv_backup -L 600G vg_backup
+  Rounding up size to full physical extent 499.90 GiB
+  Logical volume "lv_backup" created.
+
+> Create mountpoint
+# mkdir /backup
+
+> Create filesystem
+# mkfs -t xfs /dev/vg_backup/lv_backup
+meta-data=/dev/vg_backup/lv_backup isize=512    agcount=4, agsize=32761600 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=0, sparse=0
+data     =                       bsize=4096   blocks=131046400, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0 ftype=1
+log      =internal log           bsize=4096   blocks=63987, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+
+> Add to /etc/fstab
+# vi /etc/fstab
+/dev/mapper/vg_backup-lv_backup /backup xfs defaults 1 2
+
+
+
+
+-----Uninstall Satellite-----
+[root@vrhsatp202 ~]# katello-remove
+
+WARNING: This script will erase many packages and config files.
+Important packages such as the following will be removed:
+
+  * httpd (apache)
+  * mongodb
+  * tomcat
+  * puppet
+  * ruby
+  * rubygems
+  * All Katello and Foreman Packages
+
+Once these packages and configuration files are removed there is no going back.
+If you use this system for anything other than Katello and Foreman you probably
+do not want to execute this script.
+
+Read the source for a list of what is removed.  Are you sure(Y/N)? y
+
+ARE YOU SURE?: This script permanently deletes data and configuration.
+Read the source for a list of what is removed.  Type [remove] to continue? remove
+
+Redirecting to /bin/systemctl stop  foreman-tasks.service
+
+Redirecting to /bin/systemctl stop  httpd.service
+
+Redirecting to /bin/systemctl stop  pulp_workers.service
+
+Redirecting to /bin/systemctl stop  foreman-proxy.service
+
+Redirecting to /bin/systemctl stop  pulp_streamer.service
+
+Redirecting to /bin/systemctl stop  pulp_resource_manager.service
+
+Redirecting to /bin/systemctl stop  pulp_celerybeat.service
+
+Redirecting to /bin/systemctl stop  smart_proxy_dynflow_core.service
+
+Redirecting to /bin/systemctl stop  tomcat.service
+
+Redirecting to /bin/systemctl stop  squid.service
+
+Redirecting to /bin/systemctl stop  qdrouterd.service
+
+Redirecting to /bin/systemctl stop  qpidd.service
+
+Redirecting to /bin/systemctl stop  postgresql.service
+
+Redirecting to /bin/systemctl stop  mongod.service
+
+Success!
+
+
+
+
+-----Satellite Self-Register-----
+> Log in to RHSM portal (https://access.redhat.com/management/distributors?type=satellite)
+> Select 'Register a Satellite'
+> Enter hostname with full FQDN and and attach subscriptions including 'Red Hat Satellite' and 'Capsules'
+> Download manifest from portal
+***UUID on Satellite portal and UUID on subscription-manager identity don't usually match***
+
+> Upload manifest to Satellite. Content -> Red Hat Subscriptions -> Upload New Manifest
+> Add Satellite and Capsules subscriptions to activation key. Content -> Activation Keys -> CYB RHEL7 Library
+> Login to Satellite and remove existing subscription/registration
+> Register using org name and activation key
+
+[root@vrhsatp201 ~]# subscription-manager clean
+All local data removed
+
+# subscription-manager register --org="CYB" --activationkey="CYB RHEL7 Library"
+The system has been registered with ID: ca464409-5b6d-47ed-8623-bfbc83a7faca
+
+Installed Product Current Status:
+Product Name: Red Hat Software Collections (for RHEL Server)
+Status:       Subscribed
+
+Product Name: Red Hat Enterprise Linux Server
+Status:       Subscribed
+
+[root@vrhsatp201 ~]# subscription-manager identity
+system identity: ca464409-5b6d-47ed-8623-bfbc83a7faca
+name: vrhsatp201.eu.nag.net
+org name: CYB
+org ID: CYB
+environment name: Library/CYB_RHEL7_composite
+
+> Attach Satellite subscription
+# subscription-manager attach --pool 2c9ebae65baa92ca015bb013cec601ad
+Successfully attached a subscription for: Red Hat Satellite
+
+> Remove Satellite capsule subscription
+[root@vrhsatp201 ~]# subscription-manager remove --serial 4304797305381935016
+Serial numbers successfully removed at the server:
+   4304797305381935016
+1 local certificate has been deleted.
+
+> Enable Satellite 6.1 tools repo
+# subscription-manager repos --enable rhel-7-server-satellite-tools-6.1-rpms
+
+
+***If Satellite is registered with username and password, it will not attach Satellite subscription. Repos will be missing.
+
+# subscription-manager register
+Registering to: vrhsatp201.eu.nag.net:443/rhsm
+Username: foreadmin
+Password:
+Environment: Library
+The system has been registered with ID: 0ae0b5d2-0d34-4037-b9ae-2bbf6ae7ee04
+
+# subscription-manager list
++-------------------------------------------+
+    Installed Product Status
++-------------------------------------------+
+Product Name:   Red Hat Software Collections (for RHEL Server)
+Product ID:     201
+Version:        2
+Arch:           x86_64
+Status:         Not Subscribed
+Status Details: Not supported by a valid subscription.
+Starts:
+Ends:
+
+Product Name:   Red Hat Enterprise Linux Server
+Product ID:     69
+Version:        7.1
+Arch:           x86_64
+Status:         Not Subscribed
+Status Details: Not supported by a valid subscription.
+Starts:
+Ends:
+
+
+
+
+-----Satellite change from self-registered to CDN - vrhsatp201-----
+mit: Ori Rabin
+
+> Take backup of /etc/rhsm/rhsm.conf
+# cp rhsm.conf rhsm.conf.20170518
+
+> Check Satellite identity
+# subscription-manager identity
+system identity: ca464409-5b6d-47ed-8623-bfbc83a7faca
+name: vrhsatp201.eu.nag.net
+org name: CYB
+org ID: CYB
+environment name: Library/CYB_RHEL7_composite
+
+> Unregister Satellite
+# subscription-manager unregister
+System has been unregistered.
+
+
+> Modify /etc/rhsm/rhsm.conf
+# Unified Entitlement Platform Configuration
+[server]
+# Server hostname:
+hostname = subscription.rhsm.redhat.com
+
+# Server prefix:
+prefix = /subscription
+
+# Server port:
+port = 443
+
+# Set to 1 to disable certificate validation:
+insecure = 0
+
+# Set the depth of certs which should be checked
+# when validating a certificate
+ssl_verify_depth = 3
+
+# an http proxy server to use
+proxy_hostname =www-cache.eu.nag.net
+
+# port for http proxy server
+proxy_port =3128
+
+# user name for authenticating to an http proxy, if needed
+proxy_user =redhatupdateservprod
+
+# password for basic http proxy auth, if needed
+proxy_password =Nw1Pe46b
+
+[rhsm]
+# Content base URL:
+baseurl= https://cdn.redhat.com
+
+# Server CA certificate location:
+ca_cert_dir = /etc/rhsm/ca/
+
+# Default CA cert to use when generating yum repo configs:
+repo_ca_cert = %(ca_cert_dir)sredhat-uep.pem
+
+
+
+> Register Satellite with RHSM
+# subscription-manager register
+Registering to: subscription.rhsm.redhat.com:443/subscription
+Username: swachira
+Password:
+The system has been registered with ID: 8b2d28ab-aa60-48e2-ba61-8f50567e2b21
+
+> List available subscriptions
+# subscription-manager list --available --matches *Satellite*
++-------------------------------------------+
+    Available Subscriptions
++-------------------------------------------+
+Subscription Name:   Red Hat Satellite
+Provides:            Red Hat Satellite Capsule Beta
+                     Red Hat Software Collections (for RHEL Server)
+                     Red Hat Satellite Capsule
+                     Red Hat Satellite with Embedded Oracle
+                     Red Hat Beta
+                     Red Hat Satellite 6 Beta
+                     Red Hat Satellite Beta
+                     Red Hat Satellite 5 Managed DB Beta
+                     Red Hat Enterprise Linux Server
+                     Red Hat Enterprise Linux High Availability (for RHEL Server)
+                     Red Hat Satellite
+                     Red Hat Software Collections Beta (for RHEL Server)
+                     Red Hat Enterprise Linux Load Balancer (for RHEL Server)
+                     Red Hat Satellite 5 Managed DB
+SKU:                 MCT0370RN
+Contract:            10911742
+Pool ID:             8a85f981539ed51601539f06e51a2a03
+Provides Management: Yes
+Available:           1
+Suggested:           1
+Service Level:       Premium
+Service Type:        L1-L3
+Subscription Type:   Standard
+Ends:                10/03/18
+System Type:         Physical
+
+> Attach subscription to Satellite
+# subscription-manager attach --pool=8a85f981539ed51601539f06e51a2a03
+Successfully attached a subscription for: Red Hat Satellite
+
+> Check Satellite identity
+# subscription-manager identity
+system identity: 8b2d28ab-aa60-48e2-ba61-8f50567e2b21
+name: vrhsatp201.eu.nag.net
+org name: 5999999
+org ID: 5999999
+
+
+> List repos (If certificate issues displayed, check /etc/rhsm/rhsm.conf has correct CA cert configured. repo_ca_cert = %(ca_cert_dir)sredhat-uep.pem)
+# yum repolist
+Loaded plugins: langpacks, package_upload, product-id, search-disabled-repos, subscription-manager
+https://cdn.redhat.com/content/dist/rhel/server/7/7Server/x86_64/os/repodata/repomd.xml: [Errno 14] curl#60 - "Peer's certificate issuer has been marked as not trusted by the user."
+Trying other mirror.
+It was impossible to connect to the Red Hat servers.
+This could mean a connectivity issue in your environment, such as the requirement to configure a proxy,
+or a transparent proxy that tampers with TLS security, or an incorrect system clock.
+Please collect information about the specific failure that occurs in your environment,
+using the instructions in: https://access.redhat.com/solutions/1527033 and open a ticket with Red Hat Support.
+https://cdn.redhat.com/content/dist/rhel/server/7/7Server/x86_64/os/repodata/repomd.xml: [Errno 14] curl#60 - "Peer's certificate issuer has been marked as not trusted by the user."
+
+> Disable all repos
+# subscription-manager repos --disable "*"
+
+> Enable repos for RHEL 7
+subscription-manager repos --enable=rhel-7-server-rpms \
+--enable=rhel-server-rhscl-7-rpms \
+--enable=rhel-7-server-satellite-6.2-rpms
+Repository 'rhel-7-server-rpms' is enabled for this system.
+Repository 'rhel-7-server-satellite-6.1-rpms' is enabled for this system.
+Repository 'rhel-server-rhscl-7-rpms' is enabled for this system.
+
+> Clean repo metadata
+# yum clean all
+
+> List repos
+# yum repolist
+rhel-7-server-rpms/7Server/x86_64                      Red Hat Enterprise Linux 7 Server (RPMs)                                                14,285
+rhel-7-server-satellite-6.1-rpms/x86_64                Red Hat Satellite 6.1 (for RHEL 7 Server) (RPMs)                                           755
+rhel-server-rhscl-7-rpms/7Server/x86_64                Red Hat Software Collections RPMs for Red Hat Enterprise Linux 7 Server                  8,016
+
+> Check Satellite server appears in Red Hat portal (https://access.redhat.com/management/consumers)
+
+---Post tasks---
+> Disable goferd on Satellite
+> Remove katello-agent from Satellite
+
+
+
+
+-----Satellite CDN registered - create second instance of Squid-----
+Fixes: virt-who not running on CDN registered Satellite connecting via proxy
+https://access.redhat.com/solutions/2026163
+
+Issue: /var/log/rhsm/
+2017-06-19 12:11:57,322 [ERROR] @executor.py:156 - Error in communication with subscription manager:
+RemoteServerException: Server error attempting a GET to https://subscription.rhsm.redhat.com:443/rhsm/status/ returned status 404
+2017-06-19 12:12:02,776 [ERROR] @executor.py:156 - Error in communication with subscription manager:
+RemoteServerException: Server error attempting a GET to https://subscription.rhsm.redhat.com:443/rhsm/status/ returned status 404
+
+
+[1]
+> Clone existing squid service
+# cp -a /usr/lib/systemd/system/squid.service  /etc/systemd/system/squid-virtwho.service
+
+> in squid2.service, change following lines:
+EnvironmentFile=/etc/sysconfig/squid
+to
+EnvironmentFile=/etc/sysconfig/squid-virtwho
+
+
+[2]
+> Clone existing squid sysconfig
+# cp -a /etc/sysconfig/squid /etc/sysconfig/squid-virtwho
+=> This file points to a SQUID_CONF. Change that to /etc/squid/squid-virtwho.conf.
+
+
+[3]
+> Create /etc/squid/squid-virtwho.conf
+
+  http_port 4827
+  pid_filename /var/run/squid-virtwho.pid
+  visible_hostname localhost-squid-virtwho
+  cache_dir aufs /var/spool/squid-virtwho 1000 16 256
+  coredump_dir                   /var/spool/squid-virtwho
+  maximum_object_size_in_memory  1 MB
+  maximum_object_size            10 MB
+  access_log                     /var/log/squid/virtwho-access.log squid
+  cache_mem                      10 MB
+  cache_store_log                /var/log/squid/virtwho-store.log
+  cache_log                      /var/log/squid/virtwho-cache.log 
+  acl LOCAL_DOMAIN dstdomain .eu.nag.net
+  acl LOCAL_IP dst 10.0.0.0/8
+  acl LOCAL_IP dst 172.16.0.0/12
+  http_access allow localhost
+  always_direct  allow LOCAL_DOMAIN
+  always_direct  allow LOCAL_IP
+  never_direct    allow all
+  cache deny all
+  cache_peer 10.255.109.143 parent 3128 0 no-query default
+
+***Remove the cache_peer line if you are not using proxy to reach CDN
+
+
+> Set permissions and ownership
+# chown root:squid squid-virtwho.conf
+# chmod 640 squid-virtwho.conf
+
+
+[4] 
+> Create /var/spool/squid-virtwho directory, generate cache directories and set ownership and selinux settings:
+# mkdir /var/spool/squid-virtwho
+# chown -R squid:squid /var/spool/squid-virtwho
+# chcon -R --reference=/var/spool/squid /var/spool/squid-virtwho              ***Does not work if SELinux is disabled
+# semanage fcontext -a -t squid_cache_t "/var/spool/squid-virtwho(/.*)?"	  ***Does not work if SELinux is disabled
+# squid -z -f /etc/squid/squid-virtwho.conf
+
+
+[5]
+> Enable proxy settings in /etc/rhsm/rhsm.conf
+# an http proxy server to use
+proxy_hostname =www-cache.eu.nag.net
+
+# port for http proxy server
+proxy_port =3128
+
+# user name for authenticating to an http proxy, if needed
+proxy_user =redhatupdateservprod
+
+# password for basic http proxy auth, if needed
+proxy_password =Nw1Pe46b
+
+> Run satellite-installer to enable squid2
+# satellite-installer --scenario satellite --katello-proxy-url http://127.0.0.1 --katello-proxy-port 4827
+# satellite-installer --scenario satellite --katello-proxy-url http://127.0.0.1 --katello-proxy-port 4827 --katello-proxy-password --katello-proxy-username
+
+***Changing katello-proxy-url and katello-proxy-url causes subscription refresh to report 502 bad gateway.
+***If you revert back to original proxy settings, virt-who will fail
+Solution: Modify some of the proxy settings in the following files
+
+/etc/pulp/server/plugins.conf.d/puppet_importer.json
+/etc/pulp/server/plugins.conf.d/iso_importer.json
+/etc/pulp/server/plugins.conf.d/yum_importer.json
+/etc/foreman/plugins/katello.yaml
+
+
+[6]
+> Start and enable squid-virtwho
+# systemctl start squid-virtwho
+# systemctl status squid-virtwho
+# systemctl enable squid-virtwho
+
+
+[7]
+> Add to /etc/virt-who.d/vcenter1 and /etc/virt-who.d/vcenter2
+rhsm_proxy_hostname=127.0.0.1
+rhsm_proxy_port=4827
+
+
+-----Squid second instancce-----
+Corporate                            Satellite			       Satellite services
+Proxy                                /w Squid2 instance                rhsm (subscription-manager and yum)
+                                                                   
+#########                           ############                       ############
+#       #    forward requests       # 127.0.0.1#     send all          #          #
+#       #<--------------------------# :4827    #<----------------------#          #
+#       #    with DST in            #          #     requests          #          #
+#       #    the internet           #          #                       #          #
+#########                           ############                       ############
+                                    filters out
+                                    traffic for 
+                                    the local 
+                                    subnet
+                                         |
+                                         |
+                                         |
+                                         |
+                                     #########
+                                     #       #
+                                     #       #
+                                     #       #
+                                     #       #
+                                     #########
+                                     some httpd
+                                     with custom
+                                     repositories
